@@ -57,27 +57,32 @@ class MinimalPublisher(Node):
         self.screen = self.display.screen()
         self.root = self.screen.root
 
-        self.root.grab_key(self.display.keysym_to_keycode(XK.string_to_keysym("F1")),
-                      X.Mod1Mask,
-                      1,
-                      X.GrabModeAsync,
-                      X.GrabModeAsync)
-
-        # reload ROS nodes
-        self.root.grab_key(self.display.keysym_to_keycode(XK.string_to_keysym("R")),
-                      X.Mod1Mask,
+        self.root.grab_key(self.display.keysym_to_keycode(XK.string_to_keysym("Q")),
+                      X.Mod4Mask,
                       1,
                       X.GrabModeAsync,
                       X.GrabModeAsync)
         
         self.root.grab_key(self.display.keysym_to_keycode(XK.string_to_keysym("Return")),
-                      X.Mod1Mask,
+                      X.Mod4Mask,
                       1,
                       X.GrabModeAsync,
                       X.GrabModeAsync)
-       
+
+        self.root.grab_key(self.display.keysym_to_keycode(XK.string_to_keysym("space")),
+                      X.Mod4Mask,
+                      1,
+                      X.GrabModeAsync,
+                      X.GrabModeAsync)
+
+        self.root.grab_key(self.display.keysym_to_keycode(XK.string_to_keysym("E")),
+                      X.Mod4Mask,
+                      1,
+                      X.GrabModeAsync,
+                      X.GrabModeAsync)
+
         self.root.grab_button(1,
-                         X.Mod1Mask,
+                         X.Mod4Mask,
                          1,
                          X.ButtonPressMask|X.ButtonReleaseMask|X.PointerMotionMask,
                          X.GrabModeAsync,
@@ -86,7 +91,7 @@ class MinimalPublisher(Node):
                          X.NONE)
        
         self.root.grab_button(3,
-                         X.Mod1Mask,
+                         X.Mod4Mask,
                          1,
                          X.ButtonPressMask|X.ButtonReleaseMask|X.PointerMotionMask,
                          X.GrabModeAsync,
@@ -97,7 +102,7 @@ class MinimalPublisher(Node):
         self.start = None
         self.attr = None
        
-        background_color = "green"
+        background_color = "lightgreen"
         #os.system('xsetroot -solid "' + background_color + '"')
         #xcol_string = '\e]11;rgb:aa/ff/dd\a'
         xcol_string = "echo -e \'\e]11;rgb:11/00/00\\a\'"
@@ -113,7 +118,12 @@ class MinimalPublisher(Node):
         self.gc = self.root.create_gc(foreground = self.screen.black_pixel,
                                       background = self.screen.white_pixel,
                                       fill_style = X.FillOpaqueStippled,)
-                                      
+
+        self.dead_gc = self.root.create_gc(foreground = self.screen.black_pixel,
+                                           background = self.screen.white_pixel,
+                                           fill_style = X.FillOpaqueStippled,
+                                           line_style = X.LineOnOffDash)
+
         #self.gc = self.root.create_gc(
         #    line_width = 4,
         #    line_style = X.LineOnOffDash,
@@ -142,20 +152,41 @@ class MinimalPublisher(Node):
         windows = self.root.query_tree().children
         #print(windows)
         #cords = w.get_geometry()['x'],w.get_geometry()['y']]
-        
-        if ev.type == X.KeyPress and ev.child != X.NONE:
-            ev.child.configure(stack_mode = X.Above)
-            self.attr = ev.child.get_geometry()
-            self.start = ev
-            if (self.attr.width == WIN_BIG[0] and self.attr.height == WIN_BIG[1]):
-                self.start.child.configure(
-                    width = WIN_SMALL[0],
-                    height = WIN_SMALL[1])
-            else:
-                self.start.child.configure(
-                    width = WIN_BIG[0],
-                    height = WIN_BIG[1])
 
+        
+        
+        if ev.type == X.KeyPress:
+            keycode = ev.detail
+            #keysym = self.display.keycode_to_keysym(keycode, 0)
+
+            print(keycode)
+            if keycode == 36:
+                cmd = "xterm -hold -geometry 60x25+350+500 -xrm 'xterm*VT100.metaSendsEscape: true' -e bash &  "
+                self.processes[cmd]=Popen(cmd, shell=True)
+
+            if keycode == 24:
+                cmd = "xkill"
+                self.processes[cmd]=Popen(cmd, shell=True)
+            
+            if keycode == 65:
+                cmd = "dmenu_run"
+                self.processes[cmd]=Popen(cmd, shell=True)
+
+            
+
+                
+            if ev.child != X.NONE and keycode != 65 and keycode != 36 and keycode != 24:
+                ev.child.configure(stack_mode = X.Above)
+                self.attr = ev.child.get_geometry()
+                self.start = ev
+                if (self.attr.width == WIN_BIG[0] and self.attr.height == WIN_BIG[1]):
+                    self.start.child.configure(
+                        width = WIN_SMALL[0],
+                        height = WIN_SMALL[1])
+                else:
+                    self.start.child.configure(
+                        width = WIN_BIG[0],
+                        height = WIN_BIG[1])
         elif ev.type == X.ButtonPress and ev.child != X.NONE:
             ev.child.configure(stack_mode = X.Above)
             self.attr = ev.child.get_geometry()
@@ -191,7 +222,7 @@ class MinimalPublisher(Node):
 
             #print(path, the_translation)
             if the_file is not None:
-                cmd = "xterm -geometry 80x55+0+0 -e \"emacsclient -nw  "+str(path)+"/"+the_translation+".py"+";\""
+                cmd = "xterm -geometry 80x55+0+0 -xrm 'xterm*VT100.metaSendsEscape: true' -e \"echo -e \'\e]11;rgb:{a}/{b}/{c}\a\';emacsclient -nw  ".format(a="e0",b="f6",c="e3")+str(path)+"/"+the_translation+".py"+";\""
                 #            "./col.sh ee ff cc"]
                 if cmd not in self.processes:
                     self.processes[cmd]=Popen(cmd, shell=True)
@@ -260,7 +291,7 @@ class MinimalPublisher(Node):
                                 for x in range(len(windows)):
                                     w = windows[x]
                                     pid = w.get_full_property(self.display.intern_atom('_NET_WM_PID'), X.AnyPropertyType)
-                                    if 'value' in dir(pid):
+                                    if 'value' in dir(pid) and y.node_name.split("_")[-1] != '':
                                         if pid.value[0] == int(y.node_name.split("_")[-1]):
                                             winz = w # Your loops make me sick!
                                 tops.append([y.node_name, winz, time.time()])
@@ -305,13 +336,22 @@ class MinimalPublisher(Node):
 
 
 
-                                    print(time.time() - ww[2])#if time.time() -ww[2]:
-                                    self.root.poly_line(self.gc,
-                                                        X.CoordModeOrigin,
-                                                        [(int(sx),
-                                                          int(sy)),
-                                                         (int(ix),
-                                                          int(iy))])
+                                    # dashed line if no messages for > 1
+                                    if (time.time() - ww[2] > 1.0):
+                                        self.root.poly_line(self.dead_gc,
+                                                            X.CoordModeOrigin,
+                                                            [(int(sx),
+                                                              int(sy)),
+                                                             (int(ix),
+                                                              int(iy))])
+
+                                    else:
+                                        self.root.poly_line(self.gc,
+                                                            X.CoordModeOrigin,
+                                                            [(int(sx),
+                                                              int(sy)),
+                                                             (int(ix),
+                                                              int(iy))])
 
                                     lp = self.draw_arrow(sx,sy,ix,iy)
                                     self.root.poly_line(self.gc,
