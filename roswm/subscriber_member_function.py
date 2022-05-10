@@ -29,10 +29,10 @@ class MinimalSubscriber(Node):
         ppid = p.ppid()
         p = psutil.Process(ppid)
         ppid = p.ppid()
-        super().__init__('minimal_subscriber_'+str(ppid))
+        super().__init__('minimal_subscriber2_'+str(ppid))
         self.subscription = self.create_subscription(
             String,
-            'topic',
+            'topic2',
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning

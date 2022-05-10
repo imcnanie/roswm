@@ -20,7 +20,7 @@ from std_msgs.msg import String
 import os
 import psutil
 
-class MinimalPublisher(Node):
+class MinimalSubscriber(Node):
 
     def __init__(self):
         p = psutil.Process(os.getpid())
@@ -29,31 +29,29 @@ class MinimalPublisher(Node):
         ppid = p.ppid()
         p = psutil.Process(ppid)
         ppid = p.ppid()
-        super().__init__('minimal_publisher2_'+str(ppid))
-        self.publisher_ = self.create_publisher(String, 'topic2', 10)
-        timer_period = 0.5  # seconds
-        self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.i = 0
+        super().__init__('minimal_subscriber3_'+str(ppid))
+        self.subscription = self.create_subscription(
+            String,
+            'topic',
+            self.listener_callback,
+            10)
+        self.subscription  # prevent unused variable warning
 
-    def timer_callback(self):
-        msg = String()
-        msg.data = 'Hello World2: %d' % self.i
-        self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: "%s"' % msg.data)
-        self.i += 1
+    def listener_callback(self, msg):
+        self.get_logger().info('I heard: "%s"' % msg.data)
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    minimal_publisher = MinimalPublisher()
+    minimal_subscriber = MinimalSubscriber()
 
-    rclpy.spin(minimal_publisher)
+    rclpy.spin(minimal_subscriber)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    minimal_publisher.destroy_node()
+    minimal_subscriber.destroy_node()
     rclpy.shutdown()
 
 
