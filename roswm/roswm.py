@@ -13,7 +13,9 @@ from Xlib import X, XK
 from subprocess import Popen
 import psutil
 import os
+from pathlib import Path
 import math
+import time
 
 WIN_BIG = [400,300]
 WIN_SMALL = [60,30]
@@ -23,10 +25,12 @@ class MinimalPublisher(Node):
     def __init__(self):
         super().__init__('minimal_publisher')
         #self.publisher_ = self.create_publisher(String, 'topic', 30)
+        self.processes = {}
         timer_period = 0.001  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         self.init_x()
+
 
     def timer_callback(self):
         #pass
@@ -47,8 +51,7 @@ class MinimalPublisher(Node):
         #node_dummy.destroy_node()
         
         #'pub':'subs'
-        self.rosNodes = {
-        }
+        self.rosNodes = {}
         
         self.display = Display()
         self.screen = self.display.screen()
@@ -94,14 +97,14 @@ class MinimalPublisher(Node):
         self.start = None
         self.attr = None
        
-        background_color = "lightgreen"
+        background_color = "green"
         #os.system('xsetroot -solid "' + background_color + '"')
         #xcol_string = '\e]11;rgb:aa/ff/dd\a'
         xcol_string = "echo -e \'\e]11;rgb:11/00/00\\a\'"
         #os.system("./col.sh aa bb cc")
-        commands = ['xsetroot -solid "' + background_color + '"']
+        cmd = 'xsetroot -solid "' + background_color + '"'
         #            "./col.sh ee ff cc"]
-        processes = [Popen(cmd, shell=True) for cmd in commands]
+        self.processes[cmd] = Popen(cmd, shell=True)
         #print("xterm -hold -e \'"+xcol_string)
 
         self.root.change_attributes(event_mask=X.ExposureMask)  # "adds" this event mask
@@ -142,8 +145,6 @@ class MinimalPublisher(Node):
         
         if ev.type == X.KeyPress and ev.child != X.NONE:
             ev.child.configure(stack_mode = X.Above)
-        elif ev.type == X.ButtonPress and ev.child != X.NONE:
-            ev.child.configure(stack_mode = X.Above)
             self.attr = ev.child.get_geometry()
             self.start = ev
             if (self.attr.width == WIN_BIG[0] and self.attr.height == WIN_BIG[1]):
@@ -154,6 +155,70 @@ class MinimalPublisher(Node):
                 self.start.child.configure(
                     width = WIN_BIG[0],
                     height = WIN_BIG[1])
+
+        elif ev.type == X.ButtonPress and ev.child != X.NONE:
+            ev.child.configure(stack_mode = X.Above)
+            self.attr = ev.child.get_geometry()
+            self.start = ev
+            pid = ev.child.get_full_property(self.display.intern_atom('_NET_WM_PID'), X.AnyPropertyType)
+
+            the_file = None
+            path = None
+            the_translation = None
+            
+            for rn in self.rosNodes:
+                if str(pid.value[0]) in rn:
+                    p = psutil.Process(pid.value[0]).children(recursive=True)
+                    for pp in p:
+                        # add case for cpp scripts later
+                        if '/usr/bin/python3' in pp.cmdline()[0] \
+                           and 'ros2-linux/bin' not in pp.cmdline()[0]: 
+                            the_file = pp.cmdline()[1].replace("/install","/src").replace("/lib","")
+                            fi = the_file.split("/")[-1]
+                            dr = the_file.replace(fi, "")
+                            path = Path(dr)
+                            ppath = path.parent
+                            setupfile = open(str(ppath)+"/setup.py").read()
+                            for l in setupfile.split("\n"):
+                                if fi in l:
+                                    # there will be consequences for your actions!
+                                    the_translation = l.split(".")[-1].split(":")[0]
+                            #print(ppath.absolute())
+                            #version = pkg_resources.require(str(ppath.absolute())+"setup.py")[0]
+                            #print(dir(version))
+                            #print("xterm -hold -e \'"+xcol_string)
+
+
+            #print(path, the_translation)
+            if the_file is not None:
+                cmd = "xterm -geometry 80x55+0+0 -e \"emacsclient -nw  "+str(path)+"/"+the_translation+".py"+";\""
+                #            "./col.sh ee ff cc"]
+                if cmd not in self.processes:
+                    self.processes[cmd]=Popen(cmd, shell=True)
+                else:
+                    if self.processes[cmd].poll() is not None:
+                        self.processes[cmd]=Popen(cmd, shell=True)
+                    else:
+                        #print("bring to front", self.processes[cmd].pid)
+                        for x in range(len(windows)):
+                            w = windows[x]
+                            pid = w.get_full_property(self.display.intern_atom('_NET_WM_PID'), X.AnyPropertyType)
+                            #print(self.processes[cmd].pid, pid)
+                            if 'value' in dir(pid):
+                                #if self.processes[cmd].pid == pid.value[0]:
+                                if (self.processes[cmd].pid == psutil.Process(pid.value[0]).ppid()):
+                                    # raise to the top
+                                    w.configure(stack_mode = X.Above)
+                        # elevate that window to the top
+                    #print(self.processes[cmd].poll())
+                    
+                    #print(psutil.Process(pid.value[0]).exe())
+            #for p in ps:
+            #    if 
+            #    os.path.abspath()
+            #for proc in psutil.process_iter():
+            #    if proc.name() == process_name:
+            #        return proc.pid
         elif ev.type == X.MotionNotify and self.start:
             #XFillRectangle(display, window, DefaultGC(display, s), 20, 20, 10, 10)<
             
@@ -183,7 +248,7 @@ class MinimalPublisher(Node):
             self.start = None
 
             
-            
+            #self.rosNodes = {}
             for n in self.get_node_names_and_namespaces():
                 if n[0].split('_')[-1].isnumeric() and n[0].split('_')[-1] != '0':
                     self.rosNodes[n[0]] = []
@@ -198,7 +263,7 @@ class MinimalPublisher(Node):
                                     if 'value' in dir(pid):
                                         if pid.value[0] == int(y.node_name.split("_")[-1]):
                                             winz = w # Your loops make me sick!
-                                tops.append([y.node_name, winz])
+                                tops.append([y.node_name, winz, time.time()])
                             
                             self.rosNodes[n[0]].append(tops) # xwindow ID, ROSPID
 
@@ -220,7 +285,7 @@ class MinimalPublisher(Node):
                 if 'value' in dir(pid):
                     for rp in self.rosNodes:
                         if str(pid.value[0]) in rp:
-                            print(str(pid.value[0]),rp)
+                            #print(str(pid.value[0]),rp)
 
                             ptsd = rp
                             if len(self.rosNodes[rp]) == 0: continue
@@ -240,6 +305,7 @@ class MinimalPublisher(Node):
 
 
 
+                                    print(time.time() - ww[2])#if time.time() -ww[2]:
                                     self.root.poly_line(self.gc,
                                                         X.CoordModeOrigin,
                                                         [(int(sx),
@@ -318,7 +384,11 @@ class MinimalPublisher(Node):
             return [xB, yB]
         
         tan_phi = h / w
-        tan_theta = abs(dy / dx)
+        than_theta = 0.0
+        try:
+            tan_theta = abs(dy / dx)
+        except:
+            print("warning div/zero")
         
         # tell me in which quadrant the A point is
         qx = math.copysign(1, dx);
